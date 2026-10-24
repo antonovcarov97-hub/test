@@ -3,139 +3,485 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Передача файлов WebRTC</title>
+<title>Передача файлов по сети</title>
 <style>
-  body { font-family: monospace; padding: 20px; max-width: 600px; }
-  input, button { font-size: 16px; margin: 4px 0; padding: 6px; }
-  button { cursor: pointer; }
-  #log { border: 1px solid #000; height: 200px; overflow-y: auto; padding: 6px; margin-top: 10px; white-space: pre-wrap; }
-  .row { margin: 8px 0; }
-  #progress { margin-top: 8px; }
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: #f2f4f8;
+    margin: 0;
+    padding: 16px;
+    color: #222;
+    min-height: 100vh;
+  }
+  .app {
+    max-width: 560px;
+    margin: 0 auto;
+    background: #fff;
+    border-radius: 14px;
+    box-shadow: 0 4px 20px rgba(0,0,0,.08);
+    overflow: hidden;
+  }
+  header {
+    padding: 18px 20px;
+    border-bottom: 1px solid #e8ebf0;
+  }
+  header h1 {
+    font-size: 18px;
+    margin: 0;
+  }
+  header p {
+    margin: 4px 0 0;
+    font-size: 13px;
+    color: #667;
+  }
+  .tabs {
+    display: flex;
+    border-bottom: 1px solid #e8ebf0;
+  }
+  .tabs button {
+    flex: 1;
+    padding: 12px;
+    border: none;
+    background: none;
+    font-size: 14px;
+    font-weight: 600;
+    color: #667;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+  }
+  .tabs button.active {
+    color: #2563eb;
+    border-bottom-color: #2563eb;
+  }
+  .content {
+    padding: 20px;
+  }
+  .hidden { display: none !important; }
+
+  .status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    font-size: 13px;
+    margin-bottom: 16px;
+  }
+  .status .dot {
+    width: 9px; height: 9px; border-radius: 50%;
+    background: #9ca3af;
+  }
+  .status.waiting { background: #fff7e6; color: #92600a; }
+  .status.waiting .dot { background: #f59e0b; }
+  .status.online { background: #e7f7ed; color: #186c3c; }
+  .status.online .dot { background: #22c55e; }
+  .status.offline { background: #fdecec; color: #a01b1b; }
+  .status.offline .dot { background: #ef4444; }
+
+  label {
+    display: block;
+    font-size: 12px;
+    font-weight: 600;
+    color: #556;
+    margin: 12px 0 6px;
+  }
+  .code-box {
+    display: flex;
+    gap: 8px;
+  }
+  .code-box input {
+    flex: 1;
+    font-family: monospace;
+    font-size: 16px;
+    padding: 10px 12px;
+    border: 1px solid #d5dae2;
+    border-radius: 8px;
+    background: #f8fafc;
+    color: #111;
+  }
+  .code-box button {
+    padding: 0 14px;
+    border: 1px solid #d5dae2;
+    background: #fff;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 13px;
+  }
+  .code-box button:hover { background: #f2f4f8; }
+
+  .btn {
+    display: inline-block;
+    width: 100%;
+    padding: 12px;
+    border: none;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    margin-top: 12px;
+  }
+  .btn-primary { background: #2563eb; color: #fff; }
+  .btn-primary:hover { background: #1d4ed8; }
+  .btn-primary:disabled { background: #a9b8e8; cursor: not-allowed; }
+
+  .connect-row {
+    display: flex;
+    gap: 8px;
+    margin-top: 12px;
+  }
+  .connect-row input {
+    flex: 1;
+    padding: 10px 12px;
+    border: 1px solid #d5dae2;
+    border-radius: 8px;
+    font-size: 14px;
+  }
+
+  .drop {
+    border: 2px dashed #c7cdd8;
+    border-radius: 10px;
+    padding: 26px 16px;
+    text-align: center;
+    color: #667;
+    font-size: 14px;
+    cursor: pointer;
+    transition: .2s;
+    margin-top: 6px;
+  }
+  .drop:hover, .drop.over {
+    border-color: #2563eb;
+    background: #f3f7ff;
+    color: #2563eb;
+  }
+
+  .progress {
+    margin-top: 14px;
+    font-size: 13px;
+    color: #445;
+  }
+  .bar {
+    height: 6px;
+    background: #e5e8ef;
+    border-radius: 4px;
+    overflow: hidden;
+    margin-top: 6px;
+  }
+  .bar > div {
+    height: 100%;
+    width: 0%;
+    background: #2563eb;
+    transition: width .15s;
+  }
+
+  .files {
+    margin-top: 16px;
+  }
+  .file {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border: 1px solid #e8ebf0;
+    border-radius: 8px;
+    margin-bottom: 8px;
+    font-size: 13px;
+  }
+  .file .name {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .file .size { color: #889; font-size: 12px; }
+  .file a {
+    color: #2563eb;
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 13px;
+  }
+  .file a:hover { text-decoration: underline; }
+
+  .empty {
+    text-align: center;
+    color: #99a;
+    font-size: 13px;
+    padding: 24px 0;
+  }
+
+  .log {
+    margin-top: 16px;
+    border-top: 1px solid #e8ebf0;
+    padding-top: 12px;
+    font-family: monospace;
+    font-size: 12px;
+    color: #667;
+    max-height: 120px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+  }
 </style>
 </head>
 <body>
+<div class="app">
+  <header>
+    <h1>📁 Передача файлов</h1>
+    <p>Прямая передача между устройствами по WebRTC</p>
+  </header>
 
-<h3>Передача файлов (WebRTC)</h3>
+  <div class="tabs">
+    <button id="tabSend" class="active" onclick="switchTab('send')">Отправить</button>
+    <button id="tabReceive" onclick="switchTab('receive')">Получить</button>
+  </div>
 
-<div class="row">
-  <button onclick="createConnection()">1. Создать соединение (получатель)</button>
+  <div class="content">
+
+    <!-- ВКЛАДКА ОТПРАВИТЬ -->
+    <div id="paneSend">
+      <div id="sendStatus" class="status offline">
+        <span class="dot"></span>
+        <span class="label">Нет соединения</span>
+      </div>
+
+      <label>Код получателя</label>
+      <div class="code-box">
+        <input id="remoteCode" placeholder="Вставьте код" autocomplete="off">
+      </div>
+      <button class="btn btn-primary" id="connectBtn" onclick="connectToReceiver()">
+        Подключиться
+      </button>
+
+      <div id="sendArea" class="hidden">
+        <label style="margin-top:20px;">Файлы для отправки</label>
+        <div class="drop" id="dropZone">
+          Нажмите или перетащите файлы сюда
+        </div>
+        <input type="file" id="fileInput" multiple style="display:none">
+
+        <button class="btn btn-primary" id="sendBtn" onclick="sendFiles()" disabled>
+          Отправить выбранные файлы
+        </button>
+
+        <div id="sendProgress" class="progress hidden">
+          <div id="sendProgressText"></div>
+          <div class="bar"><div id="sendProgressBar"></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ВКЛАДКА ПОЛУЧИТЬ -->
+    <div id="paneReceive" class="hidden">
+      <div id="recvStatus" class="status waiting">
+        <span class="dot"></span>
+        <span class="label">Получаем код подключения…</span>
+      </div>
+
+      <label>Ваш код (покажите отправителю)</label>
+      <div class="code-box">
+        <input id="myCode" readonly placeholder="—">
+        <button onclick="copyMyCode()">Копировать</button>
+      </div>
+
+      <div id="recvProgress" class="progress hidden">
+        <div id="recvProgressText"></div>
+        <div class="bar"><div id="recvProgressBar"></div></div>
+      </div>
+
+      <label style="margin-top:20px;">Полученные файлы</label>
+      <div class="files" id="receivedFiles">
+        <div class="empty">Здесь появятся полученные файлы</div>
+      </div>
+    </div>
+
+    <div class="log" id="log"></div>
+  </div>
 </div>
-
-<div class="row">
-  Ваш ID: <input id="myId" readonly size="40">
-</div>
-
-<div class="row">
-  ID получателя: <input id="remoteId" placeholder="вставьте ID">
-  <button onclick="connectToRemote()">2. Подключиться (отправитель)</button>
-</div>
-
-<div class="row">
-  Статус: <span id="status">не подключено</span>
-</div>
-
-<div class="row">
-  <input type="file" id="fileInput" multiple>
-  <button onclick="sendFiles()">3. Отправить файлы</button>
-</div>
-
-<div id="progress"></div>
-
-<div id="log"></div>
 
 <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 <script>
+/* ===================== состояние ===================== */
 let peer = null;
 let conn = null;
-let incoming = {}; // буфер для входящих файлов
-let totalBytes = 0, receivedBytes = 0;
+let role = null;          // 'receiver' | 'sender'
+let incoming = null;      // текущий принимаемый файл
+let pendingFiles = [];    // выбранные файлы для отправки
 
 const logEl = document.getElementById('log');
-const statusEl = document.getElementById('status');
-const progressEl = document.getElementById('progress');
-
 function log(msg) {
-  logEl.textContent += msg + '\n';
+  const t = new Date().toLocaleTimeString();
+  logEl.textContent += `[${t}] ${msg}\n`;
   logEl.scrollTop = logEl.scrollHeight;
 }
 
-function setStatus(s) {
-  statusEl.textContent = s;
+/* ===================== переключение вкладок ===================== */
+function switchTab(tab) {
+  document.getElementById('tabSend').classList.toggle('active', tab === 'send');
+  document.getElementById('tabReceive').classList.toggle('active', tab === 'receive');
+  document.getElementById('paneSend').classList.toggle('hidden', tab !== 'send');
+  document.getElementById('paneReceive').classList.toggle('hidden', tab !== 'receive');
 }
 
-// 1. Создаём Peer (получатель). ID генерируется автоматически.
-function createConnection() {
-  if (peer) { log('Peer уже создан'); return; }
+/* ===================== утилиты ===================== */
+function setStatus(elId, cls, text) {
+  const el = document.getElementById(elId);
+  el.className = 'status ' + cls;
+  el.querySelector('.label').textContent = text;
+}
+
+function formatSize(b) {
+  if (b < 1024) return b + ' Б';
+  if (b < 1024 * 1024) return (b / 1024).toFixed(1) + ' КБ';
+  if (b < 1024 * 1024 * 1024) return (b / (1024 * 1024)).toFixed(1) + ' МБ';
+  return (b / (1024 * 1024 * 1024)).toFixed(2) + ' ГБ';
+}
+
+/* ===================== ПОЛУЧАТЕЛЬ: автоматический код ===================== */
+function initReceiver() {
+  if (peer) return; // уже создан
+  role = 'receiver';
+  setStatus('recvStatus', 'waiting', 'Создаём код подключения…');
 
   peer = new Peer();
 
   peer.on('open', (id) => {
-    document.getElementById('myId').value = id;
-    log('Мой ID: ' + id);
-    setStatus('ожидание подключения');
+    document.getElementById('myCode').value = id;
+    setStatus('recvStatus', 'waiting', 'Ожидание отправителя…');
+    log('Ваш код: ' + id);
   });
 
   peer.on('connection', (c) => {
+    if (conn && conn.open) {
+      log('Уже есть активное соединение, отклоняем новое');
+      c.close();
+      return;
+    }
     conn = c;
-    setupConnection();
+    setupConnection(role);
   });
 
-  peer.on('error', (err) => log('Ошибка Peer: ' + err));
+  peer.on('error', (err) => {
+    setStatus('recvStatus', 'offline', 'Ошибка соединения');
+    log('Peer error: ' + err.type + ' ' + (err.message || ''));
+  });
 }
 
-// 2. Отправитель подключается по ID получателя
-function connectToRemote() {
-  const remoteId = document.getElementById('remoteId').value.trim();
-  if (!remoteId) { log('Введите ID получателя'); return; }
-
-  if (!peer) {
-    peer = new Peer();
-    peer.on('open', () => {
-      log('Peer создан, подключаюсь...');
-      doConnect(remoteId);
-    });
-    peer.on('error', (err) => log('Ошибка Peer: ' + err));
-  } else {
-    doConnect(remoteId);
+function copyMyCode() {
+  const input = document.getElementById('myCode');
+  if (!input.value) return;
+  input.select();
+  try {
+    document.execCommand('copy');
+    log('Код скопирован');
+  } catch (e) {
+    log('Не удалось скопировать, выделите вручную');
   }
 }
 
-function doConnect(remoteId) {
-  conn = peer.connect(remoteId);
-  setupConnection();
+/* ===================== ОТПРАВИТЕЛЬ: подключение по коду ===================== */
+function connectToReceiver() {
+  const code = document.getElementById('remoteCode').value.trim();
+  if (!code) { log('Введите код получателя'); return; }
+
+  if (!peer) {
+    role = 'sender';
+    peer = new Peer();
+    peer.on('open', () => {
+      doConnect(code);
+    });
+    peer.on('error', (err) => {
+      setStatus('sendStatus', 'offline', 'Ошибка соединения');
+      log('Peer error: ' + err.type + ' ' + (err.message || ''));
+    });
+  } else {
+    doConnect(code);
+  }
 }
 
-function setupConnection() {
+function doConnect(code) {
+  setStatus('sendStatus', 'waiting', 'Подключение…');
+  conn = peer.connect(code, { reliable: true });
+  setupConnection('sender');
+}
+
+/* ===================== общая настройка соединения ===================== */
+function setupConnection(r) {
   conn.on('open', () => {
     log('Соединение установлено');
-    setStatus('подключено');
+    if (r === 'sender') {
+      setStatus('sendStatus', 'online', 'Подключено к получателю');
+      document.getElementById('sendArea').classList.remove('hidden');
+      document.getElementById('connectBtn').disabled = true;
+    } else {
+      setStatus('recvStatus', 'online', 'Подключено к отправителю');
+    }
   });
 
-  conn.on('data', handleData);
+  conn.on('data', (msg) => handleData(msg, r));
 
   conn.on('close', () => {
     log('Соединение закрыто');
-    setStatus('закрыто');
+    if (r === 'sender') {
+      setStatus('sendStatus', 'offline', 'Соединение закрыто');
+      document.getElementById('connectBtn').disabled = false;
+    } else {
+      setStatus('recvStatus', 'waiting', 'Ожидание нового подключения…');
+    }
+    conn = null;
   });
 
   conn.on('error', (err) => log('Ошибка соединения: ' + err));
 }
 
-// 3. Отправка файлов
+/* ===================== выбор файлов на отправку ===================== */
+const dropZone = document.getElementById('dropZone');
+const fileInput = document.getElementById('fileInput');
+
+dropZone.addEventListener('click', () => fileInput.click());
+fileInput.addEventListener('change', () => {
+  pendingFiles = Array.from(fileInput.files);
+  updateSendBtn();
+});
+
+['dragenter','dragover'].forEach(ev =>
+  dropZone.addEventListener(ev, e => { e.preventDefault(); dropZone.classList.add('over'); })
+);
+['dragleave','drop'].forEach(ev =>
+  dropZone.addEventListener(ev, e => { e.preventDefault(); dropZone.classList.remove('over'); })
+);
+dropZone.addEventListener('drop', e => {
+  pendingFiles = Array.from(e.dataTransfer.files);
+  updateSendBtn();
+});
+
+function updateSendBtn() {
+  const btn = document.getElementById('sendBtn');
+  if (pendingFiles.length && conn && conn.open) {
+    btn.disabled = false;
+    btn.textContent = `Отправить ${pendingFiles.length} файл(ов)`;
+  } else {
+    btn.disabled = true;
+    btn.textContent = 'Отправить выбранные файлы';
+  }
+}
+
+/* ===================== отправка файлов ===================== */
 async function sendFiles() {
   if (!conn || !conn.open) { log('Нет соединения'); return; }
+  if (!pendingFiles.length) { log('Файлы не выбраны'); return; }
 
-  const files = document.getElementById('fileInput').files;
-  if (!files.length) { log('Выберите файлы'); return; }
+  const btn = document.getElementById('sendBtn');
+  btn.disabled = true;
 
-  for (const file of files) {
-    log(`Отправка: ${file.name} (${file.size} байт)`);
+  const progress = document.getElementById('sendProgress');
+  const text = document.getElementById('sendProgressText');
+  const bar = document.getElementById('sendProgressBar');
+  progress.classList.remove('hidden');
 
-    // Метаданные
+  for (const file of pendingFiles) {
+    log(`Отправка: ${file.name} (${formatSize(file.size)})`);
     conn.send({ type: 'meta', name: file.name, size: file.size });
 
-    // Читаем и шлём чанками
-    const chunkSize = 16 * 1024; // 16 КБ
+    const chunkSize = 16 * 1024;
     let offset = 0;
 
     while (offset < file.size) {
@@ -144,53 +490,78 @@ async function sendFiles() {
       conn.send({ type: 'chunk', data: buf });
       offset += chunkSize;
 
-      const percent = Math.round((offset / file.size) * 100);
-      progressEl.textContent = `${file.name}: ${percent}%`;
+      const pct = Math.round((offset / file.size) * 100);
+      text.textContent = `${file.name} — ${pct}%`;
+      bar.style.width = pct + '%';
     }
 
     conn.send({ type: 'end' });
     log(`Отправлено: ${file.name}`);
   }
 
-  progressEl.textContent = 'Готово';
+  text.textContent = 'Все файлы отправлены';
+  bar.style.width = '100%';
+  pendingFiles = [];
+  updateSendBtn();
+
+  setTimeout(() => progress.classList.add('hidden'), 1500);
 }
 
-// Приём данных
-function handleData(msg) {
+/* ===================== приём файлов ===================== */
+function handleData(msg, r) {
+  if (r !== 'receiver') return;
+
+  const progress = document.getElementById('recvProgress');
+  const text = document.getElementById('recvProgressText');
+  const bar = document.getElementById('recvProgressBar');
+
   if (msg.type === 'meta') {
     incoming = { name: msg.name, size: msg.size, chunks: [], received: 0 };
-    totalBytes = msg.size;
-    receivedBytes = 0;
-    log(`Входящий файл: ${msg.name} (${msg.size} байт)`);
+    progress.classList.remove('hidden');
+    text.textContent = `${msg.name} — 0%`;
+    bar.style.width = '0%';
+    log(`Входящий файл: ${msg.name} (${formatSize(msg.size)})`);
   }
-
-  else if (msg.type === 'chunk') {
+  else if (msg.type === 'chunk' && incoming) {
     incoming.chunks.push(msg.data);
     incoming.received += msg.data.byteLength;
-    receivedBytes += msg.data.byteLength;
-
-    const percent = Math.round((incoming.received / incoming.size) * 100);
-    progressEl.textContent = `${incoming.name}: ${percent}%`;
+    const pct = Math.round((incoming.received / incoming.size) * 100);
+    text.textContent = `${incoming.name} — ${pct}%`;
+    bar.style.width = pct + '%';
   }
-
-  else if (msg.type === 'end') {
+  else if (msg.type === 'end' && incoming) {
     const blob = new Blob(incoming.chunks);
     const url = URL.createObjectURL(blob);
 
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = incoming.name;
-    a.textContent = `Скачать ${incoming.name}`;
-    a.style.display = 'block';
+    const list = document.getElementById('receivedFiles');
+    const empty = list.querySelector('.empty');
+    if (empty) empty.remove();
 
-    progressEl.appendChild(document.createElement('br'));
-    progressEl.appendChild(a);
+    const row = document.createElement('div');
+    row.className = 'file';
+    row.innerHTML = `
+      <span class="name">${escapeHtml(incoming.name)}</span>
+      <span class="size">${formatSize(incoming.size)}</span>
+      <a href="${url}" download="${escapeHtml(incoming.name)}">Скачать</a>
+    `;
+    list.appendChild(row);
 
-    log(`Получен файл: ${incoming.name}`);
-    incoming = {};
+    log(`Получен: ${incoming.name}`);
+    incoming = null;
+
+    setTimeout(() => progress.classList.add('hidden'), 1200);
   }
 }
-</script>
 
+function escapeHtml(s) {
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+/* ===================== автозапуск получателя ===================== */
+// По умолчанию страница работает в режиме получателя — сразу создаёт код.
+initReceiver();
+</script>
 </body>
 </html>
